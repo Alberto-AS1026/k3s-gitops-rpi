@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🍓 K3s + GitOps en Raspberry Pi
+# K3s + GitOps en Raspberry Pi
 
 **Clúster Kubernetes ligero en una Raspberry Pi 4, gestionado con Argo CD.**
 Un commit en este repositorio basta para cambiar lo que corre en el clúster.
@@ -13,7 +13,7 @@ Un commit en este repositorio basta para cambiar lo que corre en el clúster.
 
 </div>
 
-## 📌 Qué es
+## Qué es
 
 Un laboratorio para administrar un clúster Kubernetes con prácticas de producción sobre hardware limitado:
 
@@ -21,19 +21,19 @@ Un laboratorio para administrar un clúster Kubernetes con prácticas de producc
 - **Traefik** para publicar las aplicaciones por dominio.
 - **Argo CD** para desplegar todo desde Git (GitOps).
 
-## 🏗️ Arquitectura
+## Arquitectura
 
 ```mermaid
 flowchart LR
-    U["💻 Cliente"] -- "*.lab.home.arpa" --> T
-    subgraph P["🍓 Raspberry Pi 4"]
+    U["Cliente"] -- "*.lab.home.arpa" --> T
+    subgraph P["Raspberry Pi 4"]
         T["Traefik<br/>:80 / :443"] --> S["Service"] --> D["Pod"]
         A["Argo CD"] -- "aplica" --> S
     end
-    G["🐙 GitHub"] -- "sincroniza" --> A
+    G["GitHub"] -- "sincroniza" --> A
 ```
 
-## 🧰 Stack
+## Stack
 
 | Capa | Tecnología |
 |---|---|
@@ -43,13 +43,13 @@ flowchart LR
 | Ingress | Traefik 3.7 |
 | GitOps | Argo CD v3.6.1 |
 
-## 📚 Documentación
+## Documentación
 
 1. [Preparación de la Raspberry Pi](docs/01-preparacion-pi.md)
 2. [Instalación de K3s](docs/02-instalacion-k3s.md)
 3. [GitOps con Argo CD](docs/03-gitops-argocd.md)
 
-## 📁 Estructura
+## Estructura
 
 ```
 k3s-gitops-rpi/
@@ -59,7 +59,7 @@ k3s-gitops-rpi/
 └── docs/        # documentación paso a paso
 ```
 
-## 🚀 Puesta en marcha
+## Puesta en marcha
 
 ```bash
 # 1. Instalar K3s (con los ficheros de bootstrap/ ya copiados en la Pi)
