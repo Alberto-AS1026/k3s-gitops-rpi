@@ -1,0 +1,18 @@
+# Credenciales del clúster: dan control total, nunca se suben
+kubeconfig*
+*.kubeconfig
+k3s.yaml
+
+# Claves y secretos
+*.pem
+*.key
+*.crt
+id_*
+secret*.yaml
+.env
+
+# Editores y sistema
+.vscode/
+.idea/
+*.swp
+.DS_Store
