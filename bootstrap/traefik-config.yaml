@@ -1,0 +1,43 @@
+# Ajustes del Traefik que trae K3s
+# Destino en la Pi: /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+# K3s aplica automáticamente todo YAML que haya en esa carpeta.
+#
+# Problema: al desactivar ServiceLB, el Service de Traefik (tipo LoadBalancer)
+# se queda sin IP externa ("<pending>") y no es accesible desde la red.
+# Solución: Traefik escucha directamente en los puertos 80 y 443 de la Pi (hostPort).
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    # En el chart de Traefik v41 la opción es service.spec.type (antes service.type).
+    service:
+      spec:
+        type: ClusterIP
+    # Sin LoadBalancer, los Ingress no reciben dirección y Argo CD los ve como
+    # "Progressing" para siempre. Se fija a mano la IP de la Pi.
+    providers:
+      kubernetesIngress:
+        publishedService:
+          enabled: false
+        ingressEndpoint:
+          ip: "192.168.0.27"
+    ports:
+      web:
+        hostPort: 80
+      websecure:
+        hostPort: 443
+    # Con hostPort en un solo nodo, el pod nuevo no puede arrancar mientras el
+    # viejo ocupa el puerto. Primero se para el viejo y después arranca el nuevo.
+    updateStrategy:
+      rollingUpdate:
+        maxUnavailable: 1
+        maxSurge: 0
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi

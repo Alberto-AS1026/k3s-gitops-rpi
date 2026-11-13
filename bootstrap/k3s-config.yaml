@@ -1,0 +1,29 @@
+# Configuración de K3s
+# Destino en la Pi: /etc/rancher/k3s/config.yaml
+# K3s lee este fichero al arrancar; cada clave equivale a un flag de la línea de comandos.
+
+# Solo root puede leer el kubeconfig de administrador (/etc/rancher/k3s/k3s.yaml).
+write-kubeconfig-mode: "0600"
+
+# Nombre del nodo dentro de Kubernetes.
+node-name: rpi-k3s
+
+# Componentes incluidos en K3s que NO queremos:
+#  - servicelb: balanceador "Klipper". Traefik escuchará directamente en los
+#    puertos 80/443 de la Pi (ver traefik-config.yaml).
+disable:
+  - servicelb
+
+# Nombres e IPs extra que incluirá el certificado del API server,
+# para poder usar kubectl desde otros equipos con esas direcciones.
+tls-san:
+  - 192.168.0.27
+  - rpi-k3s.local
+  - rpi-k3s.lab.home.arpa
+
+# Protección del nodo: reservar recursos para el sistema y para K3s,
+# y expulsar pods antes de quedarse sin memoria.
+kubelet-arg:
+  - "system-reserved=cpu=250m,memory=256Mi"
+  - "kube-reserved=cpu=250m,memory=256Mi"
+  - "eviction-hard=memory.available<200Mi,nodefs.available<10%"
