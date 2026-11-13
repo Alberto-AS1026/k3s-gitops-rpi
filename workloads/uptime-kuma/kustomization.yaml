@@ -1,0 +1,15 @@
+# Kustomize: lista los manifiestos de la aplicación y les añade etiquetas comunes.
+# Argo CD detecta este fichero y lo usa automáticamente.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: uptime-kuma
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: k3s-gitops-rpi
+    includeSelectors: false   # no tocar los selectores (son inmutables)

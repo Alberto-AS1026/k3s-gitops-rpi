@@ -1,0 +1,15 @@
+# IP virtual estable (ClusterIP) delante del pod.
+# Puerto 80 del Service → puerto 3001 (http) del contenedor.
+apiVersion: v1
+kind: Service
+metadata:
+  name: uptime-kuma
+  namespace: uptime-kuma
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: uptime-kuma
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

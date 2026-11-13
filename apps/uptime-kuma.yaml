@@ -1,0 +1,29 @@
+# Application "uptime-kuma": despliega workloads/uptime-kuma/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: uptime-kuma
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Alberto-AS1026/k3s-gitops-rpi.git
+    targetRevision: main
+    path: workloads/uptime-kuma
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: uptime-kuma
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - PruneLast=true   # al borrar, lo último que se elimina es lo que sobra
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,25 @@
+# Namespace dedicado: aísla la aplicación y permite ponerle límites propios.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: uptime-kuma
+  labels:
+    # Pod Security Admission: Kubernetes rechaza cualquier pod de este
+    # namespace que no cumpla el perfil "restricted" (sin root, sin privilegios...).
+    pod-security.kubernetes.io/enforce: restricted
+---
+# Cuota: el total de lo que pueden pedir los pods de este namespace.
+# Aunque alguien suba un manifiesto mal hecho, nunca podrá saturar la Pi.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: uptime-kuma-quota
+  namespace: uptime-kuma
+spec:
+  hard:
+    requests.cpu: "500m"
+    requests.memory: 512Mi
+    limits.cpu: "2"
+    limits.memory: 1Gi
+    persistentvolumeclaims: "2"
+    requests.storage: 5Gi

@@ -1,0 +1,19 @@
+# Disco persistente para la base de datos SQLite de Uptime Kuma.
+# El provisionador local-path de K3s crea una carpeta en
+# /var/lib/rancher/k3s/storage/ de la Pi y la monta en el pod.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uptime-kuma-data
+  namespace: uptime-kuma
+  annotations:
+    # Protección: Argo CD nunca borrará este PVC (ni los datos) aunque
+    # el fichero desaparezca de Git.
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  accessModes:
+    - ReadWriteOnce        # lo monta un solo nodo a la vez
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi         # local-path no impone este tamaño; es orientativo
