@@ -1,0 +1,26 @@
+# Application raíz (patrón app-of-apps)
+# Es lo ÚNICO que se aplica a mano para arrancar el GitOps:
+#   kubectl apply -f bootstrap/root-app.yaml
+# A partir de aquí, Argo CD lee la carpeta apps/ del repositorio y crea
+# una Application por cada fichero que encuentre.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  # Si se borra esta Application, Argo CD borra también todo lo que creó.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Alberto-AS1026/k3s-gitops-rpi.git
+    targetRevision: main
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true     # lo que se borra de Git se borra del clúster
+      selfHeal: true  # los cambios manuales en el clúster se revierten

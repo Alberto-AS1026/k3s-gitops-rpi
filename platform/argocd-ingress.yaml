@@ -1,0 +1,24 @@
+# Publica la interfaz web de Argo CD en http://argocd.lab.home.arpa
+# Traefik recibe la petición en el puerto 80 de la Pi y, si el Host coincide,
+# la envía al Service argocd-server (puerto 80; el pod sirve HTTP porque
+# server.insecure=true).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: argocd.lab.home.arpa
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
