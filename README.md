@@ -72,7 +72,7 @@ flowchart LR
 |---|---|---|
 | 1 | [Preparación de la Raspberry Pi](docs/01-preparacion-pi.md): acceso SSH por clave, cgroups, swap, kernel | ✅ Hecho |
 | 2 | [Instalación de K3s](docs/02-instalacion-k3s.md): Traefik con hostPort, reserva de recursos, kubectl remoto | ✅ Hecho |
-| 3 | GitOps con Argo CD: instalación, app-of-apps, sincronización automática | 🚧 En curso |
+| 3 | [GitOps con Argo CD](docs/03-gitops-argocd.md): app-of-apps, sincronización automática, self-heal | ✅ Hecho |
 | 4 | Aplicación de ejemplo con almacenamiento persistente, `requests`/`limits` e Ingress | ⏳ Pendiente |
 | 5 | Monitorización y guía de troubleshooting | ⏳ Pendiente |
 
@@ -85,6 +85,8 @@ flowchart LR
 | Sin ServiceLB, Traefik quedaba en `<pending>` | `hostPort` 80/443 y `service.spec.type: ClusterIP` (opción renombrada en el chart v41) ([2.5](docs/02-instalacion-k3s.md)) |
 | Con `hostPort` en un solo nodo, las actualizaciones de Traefik se bloquean | Estrategia `maxSurge: 0` / `maxUnavailable: 1` |
 | Sin LoadBalancer, los Ingress no tienen dirección y Argo CD los ve `Progressing` | `ingressEndpoint.ip` con la IP del nodo |
+| Los CRD de Argo CD superan el límite de tamaño de `kubectl apply` | *Server-side apply* (`--server-side`) ([3.2](docs/03-gitops-argocd.md)) |
+| Bucle de redirecciones HTTPS entre Argo CD y Traefik | `server.insecure: true`: Traefik es la única puerta de entrada ([3.3](docs/03-gitops-argocd.md)) |
 | Proteger el nodo frente a cargas que consumen toda la RAM | `system-reserved`, `kube-reserved` y `eviction-hard` en el kubelet |
 
 ## 📁 Estructura del repositorio
@@ -94,10 +96,16 @@ k3s-gitops-rpi/
 ├── README.md
 ├── bootstrap/                 # se aplica a mano UNA vez, antes del GitOps
 │   ├── k3s-config.yaml        #   → /etc/rancher/k3s/config.yaml
-│   └── traefik-config.yaml    #   → /var/lib/rancher/k3s/server/manifests/
+│   ├── traefik-config.yaml    #   → /var/lib/rancher/k3s/server/manifests/
+│   └── root-app.yaml          #   kubectl apply → arranca el GitOps
+├── apps/                      # Applications de Argo CD (una por fichero)
+│   └── platform.yaml
+├── platform/                  # configuración del clúster gestionada por Argo CD
+│   └── argocd-ingress.yaml
 └── docs/                      # documentación detallada, paso a paso
     ├── 01-preparacion-pi.md
-    └── 02-instalacion-k3s.md
+    ├── 02-instalacion-k3s.md
+    └── 03-gitops-argocd.md
 ```
 
 ## 🚀 Cómo reproducirlo
@@ -109,7 +117,14 @@ k3s-gitops-rpi/
    sudo INSTALL_K3S_VERSION="v1.37.2+k3s1" sh k3s-install.sh
    ```
    El detalle está en [docs/02-instalacion-k3s.md](docs/02-instalacion-k3s.md).
-3. **GitOps:** en construcción.
+3. **Instalar Argo CD y arrancar el GitOps:**
+   ```bash
+   kubectl create namespace argocd
+   kubectl apply -n argocd --server-side --force-conflicts \
+     -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.6.1/manifests/install.yaml
+   kubectl apply -f bootstrap/root-app.yaml
+   ```
+   Desde aquí, **todo cambio se hace con un commit**. El detalle está en [docs/03-gitops-argocd.md](docs/03-gitops-argocd.md).
 
 ---
 
