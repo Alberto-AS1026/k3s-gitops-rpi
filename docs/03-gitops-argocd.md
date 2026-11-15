@@ -2,7 +2,7 @@
 
 Objetivo: que el clúster se gestione desde este repositorio de GitHub. Un commit cambia lo que corre en la Pi, y cualquier cambio hecho a mano en el clúster se revierte solo.
 
-Fecha: 2026-11-13
+Fecha: 2026-11-13 · reconstrucción en SSD: 2026-11-15
 
 ## Resultado
 
@@ -177,6 +177,26 @@ Comprobación sin navegador:
 ```bash
 curl -H "Host: argocd.lab.home.arpa" http://192.168.0.27/api/version    # → "Version":"v3.6.1"
 ```
+
+## 3.8 Reconstrucción del clúster desde Git
+
+Tras cambiar la microSD falsificada por un SSD (ver [4.4](04-aplicacion-uptime-kuma.md)), el clúster se reinstaló desde cero. Con el repositorio ya completo en GitHub, bastó con:
+
+```bash
+# 1. Instalar K3s con los ficheros de bootstrap/ (ver 2.)
+# 2. Instalar Argo CD y aplicar los ajustes de 3.3
+# 3. Arrancar el GitOps:
+kubectl apply -f bootstrap/root-app.yaml
+```
+
+| Tiempo desde `kubectl apply` | Estado |
+|---|---|
+| 0 s | Solo existe la Application `root` |
+| **82 s** | `root`, `platform` y `uptime-kuma` en `Synced/Healthy`, con Uptime Kuma funcionando, su disco persistente y su Ingress |
+
+Ningún manifiesto se volvió a escribir ni a aplicar a mano: Argo CD lo recreó todo a partir de Git. Esa es la ventaja principal de GitOps: **el repositorio es el clúster**. Si la Pi se rompe, se reconstruye igual en minutos.
+
+> En el SSD, Argo CD tardó 73 s en estar listo, frente a unos 3 minutos en la microSD: la descarga y descompresión de imágenes depende mucho de la velocidad del disco.
 
 ## Consumo de recursos
 

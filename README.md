@@ -37,17 +37,19 @@ flowchart LR
 
 | Capa | Tecnología |
 |---|---|
-| Hardware | Raspberry Pi 4 Model B (4 GB) |
+| Hardware | Raspberry Pi 4 Model B (4 GB) + SSD por USB 3 |
 | Sistema | Raspberry Pi OS 64-bit (Debian 13) |
 | Kubernetes | K3s v1.37.2 |
 | Ingress | Traefik 3.7 |
 | GitOps | Argo CD v3.6.1 |
+| Aplicación de ejemplo | Uptime Kuma 2.5 con disco persistente |
 
 ## Documentación
 
 1. [Preparación de la Raspberry Pi](docs/01-preparacion-pi.md)
 2. [Instalación de K3s](docs/02-instalacion-k3s.md)
 3. [GitOps con Argo CD](docs/03-gitops-argocd.md)
+4. [Aplicación de ejemplo: Uptime Kuma](docs/04-aplicacion-uptime-kuma.md)
 
 ## Estructura
 
@@ -56,6 +58,7 @@ k3s-gitops-rpi/
 ├── bootstrap/   # configuración inicial, se aplica a mano una vez
 ├── apps/        # aplicaciones de Argo CD (una por fichero)
 ├── platform/    # configuración del clúster gestionada por Argo CD
+├── workloads/   # manifiestos de las aplicaciones
 └── docs/        # documentación paso a paso
 ```
 

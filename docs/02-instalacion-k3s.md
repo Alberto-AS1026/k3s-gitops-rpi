@@ -2,7 +2,9 @@
 
 Objetivo: tener un clúster Kubernetes de un nodo funcionando en la Pi, con Traefik recibiendo tráfico en los puertos 80/443 y `kubectl` operativo desde el ordenador de trabajo.
 
-Fecha: 2026-11-13
+Fecha: 2026-11-13 (primer intento, en microSD) · 2026-11-15 (instalación definitiva, en SSD)
+
+> En el SSD la instalación funcionó **a la primera y sin reinicios**: el problema 2.4 no se repitió y la corrección de 2.5 ya estaba en `bootstrap/traefik-config.yaml`.
 
 ## Resultado
 
@@ -92,6 +94,8 @@ El instalador:
 
 ## 2.4 Problema 1: kube-proxy no arranca (kernel dañado)
 
+> Ocurrió en el primer intento, sobre la microSD.
+
 ### Síntoma
 
 K3s arrancaba y se paraba a los pocos segundos. `kubectl` daba `connection refused` en el puerto 6443. En el registro:
@@ -130,7 +134,8 @@ kube-proxy exited: iptables is not available on this host :
    - Se repitió la verificación dos veces y dio el mismo resultado: la lectura es estable.
    - `dmesg` no mostraba errores de la SD ni de ext4.
    - Los demás paquetes probados estaban intactos; solo fallaba el kernel instalado el día anterior.
-   - Conclusión: **actualización del kernel interrumpida**, probablemente por un apagado o un corte de luz durante el `apt upgrade`.
+   - Conclusión **provisional**: actualización del kernel interrumpida.
+5. **Conclusión definitiva (días después):** al desplegar Uptime Kuma apareció otro fichero corrupto, esta vez en una imagen de contenedor descargada y verificada. La causa real era la **microSD falsificada**, que corrompía datos al escribirlos (ver [4.4](04-aplicacion-uptime-kuma.md)). La lectura era estable porque el dato se *grababa* mal.
 
 ### Solución
 
@@ -143,7 +148,12 @@ sudo modprobe nf_tables br_netfilter nf_conntrack nf_nat   # → todos cargan
 sudo reboot
 ```
 
-> **Lección:** nunca apagues la Pi desenchufándola, y menos durante una actualización. Usa `sudo poweroff`. Ante un error "imposible", verifica la integridad de los paquetes con `dpkg -V`.
+La reinstalación solo arregló el síntoma: la tarjeta siguió corrompiendo otros ficheros.
+
+> **Lecciones:**
+> - Ante un error "imposible", verifica la integridad de los paquetes con `dpkg -V`.
+> - Si aparece corrupción de datos, sospecha primero del **hardware de almacenamiento**, aunque el kernel no registre errores.
+> - Una conclusión provisional hay que revisarla en cuanto aparecen pruebas nuevas.
 
 ## 2.5 Problema 2: el Service de Traefik seguía en `<pending>`
 
