@@ -172,6 +172,22 @@ Argo CD lo recreó en **1 segundo**. El UID nuevo demuestra que es un objeto dis
    kubectl -n argocd delete secret argocd-initial-admin-secret
    ```
 
+También se puede cambiar la contraseña sin navegador, con la API de Argo CD:
+
+```bash
+API=http://192.168.0.27/api/v1; H="Host: argocd.lab.home.arpa"
+INIT=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
+NEW=$(python3 -c 'import secrets; print(secrets.token_urlsafe(16))')
+TOKEN=$(curl -s -H "$H" -X POST $API/session -d "{\"username\":\"admin\",\"password\":\"$INIT\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
+curl -s -H "$H" -H "Authorization: Bearer $TOKEN" -X PUT $API/account/password \
+  -d "{\"name\":\"admin\",\"currentPassword\":\"$INIT\",\"newPassword\":\"$NEW\"}"
+kubectl -n argocd delete secret argocd-initial-admin-secret
+```
+
+1. `POST /session` entrega un **token** (un pase temporal) a cambio de usuario y contraseña.
+2. `PUT /account/password` cambia la contraseña presentando ese token.
+3. Comprobación: la contraseña nueva da `200` y la inicial, `401` (no autorizado).
+
 Comprobación sin navegador:
 
 ```bash

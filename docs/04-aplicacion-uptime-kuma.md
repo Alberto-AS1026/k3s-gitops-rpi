@@ -277,6 +277,22 @@ kubectl top node                   # → todo el nodo: ~270m CPU, ~2 GiB (64 % d
    ```
 2. Abrir http://status.lab.home.arpa y **crear el usuario administrador** en la primera pantalla. La primera persona que entre lo crea, así que conviene hacerlo nada más desplegar.
 
+### 4.7.1 Crear el administrador sin navegador
+
+Uptime Kuma no tiene API REST para la configuración inicial: su página web habla con el servidor por **socket.io**, un canal en tiempo real sobre WebSocket. Se puede hacer lo mismo desde dentro del pod, que ya trae la librería `socket.io-client`:
+
+```bash
+PASS=$(python3 -c 'import secrets; print(secrets.token_urlsafe(16))')   # contraseña aleatoria fuerte
+kubectl -n uptime-kuma exec deploy/uptime-kuma -- node -e '
+const io = require("socket.io-client"); const [u, p] = process.argv.slice(1);
+const s = io("http://localhost:3001", {transports: ["websocket"]});
+s.on("connect", () => s.emit("setup", u, p, r => { console.log(r.ok ? "OK" : r.msg); process.exit(0) }));
+' admin "$PASS"
+```
+
+- La llamada `setup(usuario, contraseña, respuesta)` se tomó del código fuente (`server/server.js`) y rechaza contraseñas débiles.
+- Comprobación: `needSetup` pasa a `false`, el `login` con la contraseña correcta da `ok: true` y con una incorrecta, `false`.
+
 ## Comandos útiles
 
 | Comando | Para qué |
