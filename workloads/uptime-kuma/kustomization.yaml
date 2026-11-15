@@ -9,6 +9,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - monitor-api.yaml
 labels:
   - pairs:
       app.kubernetes.io/part-of: k3s-gitops-rpi

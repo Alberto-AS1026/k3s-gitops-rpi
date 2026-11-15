@@ -22,6 +22,8 @@ spec:
       # Evita que Kubernetes inyecte variables como UPTIME_KUMA_PORT=tcp://...
       # (por el Service "uptime-kuma"), que Uptime Kuma confundiría con su puerto.
       enableServiceLinks: false
+      # La aplicación no necesita hablar con la API de Kubernetes: sin token montado.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000          # usuario "node" de la imagen rootless

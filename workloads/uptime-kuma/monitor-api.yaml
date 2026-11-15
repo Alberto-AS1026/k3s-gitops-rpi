@@ -1,0 +1,21 @@
+# Identidad para que Uptime Kuma vigile la API de Kubernetes (/readyz).
+# Mínimo privilegio: no tiene ningún Role ni RoleBinding. Solo puede usar lo que
+# Kubernetes permite a cualquier identidad válida (rol system:public-info-viewer:
+# /livez, /readyz, /healthz, /version). Listar pods, por ejemplo, da 403.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: monitor-api
+  namespace: uptime-kuma
+automountServiceAccountToken: false
+---
+# Token de larga duración para esa cuenta. En Git no hay ningún secreto:
+# Kubernetes genera el token y lo guarda en este Secret automáticamente.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitor-api-token
+  namespace: uptime-kuma
+  annotations:
+    kubernetes.io/service-account.name: monitor-api
+type: kubernetes.io/service-account-token
