@@ -50,7 +50,7 @@ spec:
               cpu: "1"
               memory: 512Mi
           # startupProbe: margen de hasta 5 min para el primer arranque
-          # (crea la base de datos en la microSD).
+          # (crea la base de datos en el disco).
           startupProbe:
             httpGet:
               path: /api/entry-page

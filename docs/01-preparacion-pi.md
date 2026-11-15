@@ -68,41 +68,11 @@ F=/var/tmp/prueba-capacidad.bin
 SZ=$(( $(df -B1 --output=avail / | tail -1) - 20*1024**3 ))    # libre menos 20 GB
 sudo fallocate -l $SZ $F
 sudo filefrag -v $F | tail -3          # zona física que ocupa: de 11 GB a 2043 GB
-sudo python3 -I prueba-disco.py $F 512
+sudo python3 -I scripts/prueba-disco.py $F 512
 sudo rm $F && sudo fstrim -v /         # fstrim: avisa al SSD de que ese espacio vuelve a estar libre
 ```
 
-<details>
-<summary><code>prueba-disco.py</code></summary>
-
-```python
-import hashlib, mmap, os, sys
-path, n = sys.argv[1], int(sys.argv[2])
-BS = 4 * 1024 * 1024
-size = os.path.getsize(path)
-offsets = [(i * ((size - BS) // (n - 1))) // BS * BS for i in range(n)]
-
-def block(i):                      # contenido único y reproducible para cada bloque
-    seed, out = hashlib.sha256(f"bloque-{i}".encode()).digest(), bytearray()
-    while len(out) < BS:
-        seed = hashlib.sha256(seed).digest(); out += seed * 128
-    return bytes(out[:BS])
-
-buf = mmap.mmap(-1, BS)            # memoria alineada, necesaria para O_DIRECT
-fd = os.open(path, os.O_RDWR | os.O_DIRECT); expected = []
-for i, off in enumerate(offsets):
-    d = block(i); buf.seek(0); buf.write(d); os.pwrite(fd, buf, off)
-    expected.append(hashlib.sha256(d).hexdigest())
-os.fsync(fd); os.close(fd)
-os.sync(); open("/proc/sys/vm/drop_caches", "w").write("3\n")   # vaciar caché
-
-fd = os.open(path, os.O_RDONLY | os.O_DIRECT)
-bad = [i for i, off in enumerate(offsets)
-       if (os.preadv(fd, [buf], off), hashlib.sha256(buf[:]).hexdigest())[1] != expected[i]]
-print(f"bloques erróneos: {len(bad)} de {n}")
-```
-
-</details>
+El script está en [`scripts/prueba-disco.py`](../scripts/prueba-disco.py) (comentado paso a paso).
 
 Resultado: **0 bloques erróneos de 512**, hasta los 1904 GB del fichero (2043 GB físicos), en 47 segundos. El disco tiene la capacidad real que anuncia.
 

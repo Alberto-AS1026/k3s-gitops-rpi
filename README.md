@@ -20,6 +20,7 @@ Un laboratorio para administrar un clúster Kubernetes con prácticas de producc
 - **K3s** instalado y ajustado a mano en una Raspberry Pi 4.
 - **Traefik** para publicar las aplicaciones por dominio.
 - **Argo CD** para desplegar todo desde Git (GitOps).
+- **Uptime Kuma** para vigilar el propio clúster, con una página de estado pública.
 
 ## Arquitectura
 
@@ -29,6 +30,8 @@ flowchart LR
     subgraph P["Raspberry Pi 4"]
         T["Traefik<br/>:80 / :443"] --> S["Service"] --> D["Pod"]
         A["Argo CD"] -- "aplica" --> S
+        K["Uptime Kuma"] -. "vigila" .-> T
+        K -. "vigila" .-> A
     end
     G["GitHub"] -- "sincroniza" --> A
 ```
@@ -43,6 +46,7 @@ flowchart LR
 | Ingress | Traefik 3.7 |
 | GitOps | Argo CD v3.6.1 |
 | Aplicación de ejemplo | Uptime Kuma 2.5 con disco persistente |
+| Monitorización | metrics-server (`kubectl top`) y Uptime Kuma |
 
 ## Documentación
 
@@ -50,6 +54,7 @@ flowchart LR
 2. [Instalación de K3s](docs/02-instalacion-k3s.md)
 3. [GitOps con Argo CD](docs/03-gitops-argocd.md)
 4. [Aplicación de ejemplo: Uptime Kuma](docs/04-aplicacion-uptime-kuma.md)
+5. [Monitorización y troubleshooting](docs/05-monitorizacion-troubleshooting.md)
 
 ## Estructura
 
@@ -59,6 +64,7 @@ k3s-gitops-rpi/
 ├── apps/        # aplicaciones de Argo CD (una por fichero)
 ├── platform/    # configuración del clúster gestionada por Argo CD
 ├── workloads/   # manifiestos de las aplicaciones
+├── scripts/     # utilidades: prueba del disco y monitores de Uptime Kuma
 └── docs/        # documentación paso a paso
 ```
 
@@ -75,4 +81,8 @@ kubectl apply -n argocd --server-side --force-conflicts \
 
 # 3. Arrancar el GitOps
 kubectl apply -f bootstrap/root-app.yaml
+
+# 4. Crear los monitores de Uptime Kuma (ver docs/05, apartado 5.6)
+TOKEN=$(kubectl -n uptime-kuma get secret monitor-api-token -o jsonpath='{.data.token}' | base64 -d)
+kubectl -n uptime-kuma exec -i deploy/uptime-kuma -- node - "<contraseña de admin>" "$TOKEN" < scripts/uptime-kuma-monitores.js
 ```
