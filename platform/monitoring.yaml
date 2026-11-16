@@ -1,0 +1,35 @@
+# Namespaces de la monitorización (ver docs/06).
+#   monitoring       VictoriaMetrics, kube-state-metrics, Grafana y alertas. Perfil "restricted".
+#   monitoring-node  Solo node-exporter: necesita ver el host (hostNetwork, hostPID, hostPath),
+#                    algo que "restricted" y "baseline" prohíben.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    # warn: avisa ya al aplicar un Deployment, no solo cuando se rechaza el pod.
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring-node
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+---
+# Cuota del namespace monitoring. Obliga a que todos los contenedores
+# (también los init) declaren requests y limits.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: monitoring-quota
+  namespace: monitoring
+spec:
+  hard:
+    requests.cpu: "500m"
+    requests.memory: 768Mi
+    limits.cpu: "3"
+    limits.memory: 2Gi
+    persistentvolumeclaims: "3"
+    requests.storage: 15Gi

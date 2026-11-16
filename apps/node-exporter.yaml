@@ -1,0 +1,41 @@
+# Application "node-exporter": métricas del nodo (ver docs/06).
+# Lee /proc y /sys del host: CPU, RAM, disco, red, temperatura (cpu_thermal)
+# y la alarma de subtensión de la Pi (rpi_volt). Por eso va en monitoring-node.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: node-exporter
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-node-exporter
+    targetRevision: 5.1.0
+    helm:
+      releaseName: node-exporter
+      valuesObject:
+        fullnameOverride: node-exporter
+        resources:
+          requests: { cpu: 20m, memory: 32Mi }
+          limits: { cpu: 200m, memory: 64Mi }
+        # Los dos valores por defecto del chart, añadiendo las carpetas internas
+        # de K3s para no medir cada volumen de contenedor como si fuera un disco.
+        extraArgs:
+          - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|run/k3s/.+|var/lib/docker/.+|var/lib/kubelet/.+|var/lib/rancher/k3s/agent/.+)($|/)
+          - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring-node
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

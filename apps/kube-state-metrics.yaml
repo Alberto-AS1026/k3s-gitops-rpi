@@ -1,0 +1,35 @@
+# Application "kube-state-metrics": convierte el estado de los objetos de
+# Kubernetes en métricas (pods, reinicios, réplicas, PVC...). Ver docs/06.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-state-metrics
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-state-metrics
+    targetRevision: 9.0.1
+    helm:
+      releaseName: kube-state-metrics
+      valuesObject:
+        fullnameOverride: kube-state-metrics
+        resources:
+          requests: { cpu: 20m, memory: 48Mi }
+          limits: { cpu: 200m, memory: 128Mi }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

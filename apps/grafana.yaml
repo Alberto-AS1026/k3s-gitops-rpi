@@ -1,0 +1,106 @@
+# Application "grafana": gráficas en http://grafana.lab.home.arpa (ver docs/06).
+# Lee las métricas de VictoriaMetrics y carga los dashboards al arrancar.
+# La contraseña de admin está en el Secret "grafana-admin", creado a mano (no va en Git).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://grafana-community.github.io/helm-charts
+    chart: grafana
+    targetRevision: 14.4.1
+    helm:
+      releaseName: grafana
+      valuesObject:
+        testFramework:
+          enabled: false             # Argo CD no ejecuta los tests de Helm
+        admin:
+          existingSecret: grafana-admin
+          userKey: admin-user
+          passwordKey: admin-password
+        # Recreate: con un disco ReadWriteOnce y SQLite, nunca dos pods a la vez.
+        deploymentStrategy:
+          type: Recreate
+        initChownData:
+          enabled: false             # corre como root: incompatible con "restricted"
+        persistence:
+          enabled: true
+          storageClassName: local-path
+          size: 1Gi
+        resources:
+          requests: { cpu: 50m, memory: 192Mi }
+          limits: { cpu: 500m, memory: 512Mi }
+        downloadDashboards:
+          resources:                 # obligatorio por la ResourceQuota
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+        ingress:
+          enabled: true
+          ingressClassName: traefik
+          annotations:
+            traefik.ingress.kubernetes.io/router.entrypoints: web
+          hosts: [grafana.lab.home.arpa]
+        grafana.ini:
+          server:
+            root_url: http://grafana.lab.home.arpa
+          analytics:
+            reporting_enabled: false
+            check_for_updates: false
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: VictoriaMetrics
+                uid: victoriametrics
+                type: prometheus     # VictoriaMetrics habla la API de Prometheus
+                access: proxy
+                url: http://vmsingle.monitoring.svc:8428
+                isDefault: true
+                jsonData:
+                  timeInterval: 30s  # igual que el intervalo de scrape
+        dashboardProviders:
+          dashboardproviders.yaml:
+            apiVersion: 1
+            providers:
+              - name: nodo
+                orgId: 1
+                folder: Nodo
+                type: file
+                disableDeletion: true
+                editable: false
+                options: { path: /var/lib/grafana/dashboards/nodo }
+              - name: kubernetes
+                orgId: 1
+                folder: Kubernetes
+                type: file
+                disableDeletion: true
+                editable: false
+                options: { path: /var/lib/grafana/dashboards/kubernetes }
+        # Versiones fijas: los dashboards no cambian solos.
+        dashboards:
+          nodo:
+            node-exporter-full: { gnetId: 1860, revision: 46, datasource: VictoriaMetrics }
+            victoriametrics: { gnetId: 10229, revision: 61, datasource: VictoriaMetrics }
+          kubernetes:
+            k8s-views-global: { url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-global.json }
+            k8s-views-namespaces: { url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-namespaces.json }
+            k8s-views-nodes: { url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-nodes.json }
+            k8s-views-pods: { url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/v3.0.8/dashboards/k8s-views-pods.json }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

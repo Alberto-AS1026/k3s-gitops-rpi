@@ -1,0 +1,106 @@
+# Application "victoria-metrics": base de datos de métricas (ver docs/06).
+# VictoriaMetrics "single" guarda las métricas y además las recoge (scrape)
+# cada 30 s de node-exporter, kube-state-metrics y cAdvisor (el kubelet).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: victoria-metrics
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    chart: victoria-metrics-single
+    targetRevision: 0.51.0
+    helm:
+      releaseName: victoria-metrics
+      valuesObject:
+        server:
+          fullnameOverride: vmsingle          # Service: vmsingle.monitoring.svc:8428
+          retentionPeriod: 30d                # 30 días de historia
+          persistentVolume:
+            enabled: true
+            storageClassName: local-path
+            size: 10Gi
+          resources:
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          # El chart no trae securityContext: se da a mano para cumplir "restricted".
+          podSecurityContext:
+            enabled: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile: { type: RuntimeDefault }
+          securityContext:
+            enabled: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          scrape:
+            enabled: true
+            config:
+              global:
+                scrape_interval: 30s
+              scrape_configs:
+                # La propia base de datos
+                - job_name: victoriametrics
+                  static_configs:
+                    - targets: ["localhost:8428"]
+
+                # CPU y memoria de cada contenedor (cAdvisor, dentro del kubelet de K3s)
+                - job_name: kubernetes-nodes-cadvisor
+                  scheme: https
+                  tls_config:
+                    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                    insecure_skip_verify: true   # el certificado del kubelet no lo firma esa CA
+                  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                  kubernetes_sd_configs:
+                    - role: node
+                  metrics_path: /metrics/cadvisor
+                  honor_timestamps: false
+                  relabel_configs:
+                    - action: labelmap
+                      regex: __meta_kubernetes_node_label_(.+)
+
+                # El nodo: CPU, RAM, disco, red, temperatura y tensión de la Pi
+                - job_name: node-exporter
+                  kubernetes_sd_configs:
+                    - role: endpointslice
+                      namespaces: { names: [monitoring-node] }
+                  relabel_configs:
+                    - source_labels: [__meta_kubernetes_service_name]
+                      regex: node-exporter
+                      action: keep
+                    - source_labels: [__meta_kubernetes_pod_node_name]
+                      target_label: node
+
+                # Los objetos de Kubernetes: pods, reinicios, deployments, PVC...
+                - job_name: kube-state-metrics
+                  honor_labels: true
+                  kubernetes_sd_configs:
+                    - role: endpointslice
+                      namespaces: { names: [monitoring] }
+                  relabel_configs:
+                    - source_labels: [__meta_kubernetes_service_name]
+                      regex: kube-state-metrics
+                      action: keep
+                    - source_labels: [__meta_kubernetes_endpointslice_port_name]
+                      regex: http
+                      action: keep
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
