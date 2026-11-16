@@ -1,0 +1,140 @@
+# Application "alertas": vmalert evalúa las reglas sobre las métricas de
+# VictoriaMetrics y Alertmanager envía las alertas a Telegram (ver docs/06).
+# El token del bot y el chat_id están en el Secret "alertmanager-telegram",
+# creado a mano (no va en Git), y Alertmanager los lee como ficheros.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alertas
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    chart: victoria-metrics-alert
+    targetRevision: 0.53.0
+    helm:
+      releaseName: alertas
+      valuesObject:
+        server:
+          fullnameOverride: vmalert
+          datasource:
+            url: http://vmsingle.monitoring.svc:8428
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          podSecurityContext:
+            enabled: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile: { type: RuntimeDefault }
+          securityContext:
+            enabled: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          config:
+            alerts:
+              groups:
+                - name: raspberry-pi
+                  rules:
+                    - alert: PiTemperaturaAlta
+                      expr: max(node_thermal_zone_temp{type="cpu-thermal"}) > 75
+                      for: 5m
+                      labels: { severity: warning }
+                      annotations:
+                        summary: 'CPU de la Pi a {{ $value | printf "%.1f" }} °C (a partir de 80 °C se frena)'
+                    - alert: PiSubtension
+                      expr: max(node_hwmon_in_lcrit_alarm_volts{chip=~".*raspberrypi_hwmon"}) == 1
+                      for: 1m
+                      labels: { severity: critical }
+                      annotations:
+                        summary: 'La fuente de alimentación no da suficiente tensión (sensor rpi_volt)'
+                    - alert: PiMemoriaBaja
+                      expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+                      for: 5m
+                      labels: { severity: critical }
+                      annotations:
+                        summary: 'Memoria disponible del nodo: {{ $value | printf "%.0f" }} % (K3s expulsa pods por debajo de 200 MiB)'
+                    - alert: PiDiscoCasiLleno
+                      expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100 < 15
+                      for: 10m
+                      labels: { severity: warning }
+                      annotations:
+                        summary: 'Disco raíz con {{ $value | printf "%.0f" }} % libre'
+                - name: kubernetes
+                  rules:
+                    - alert: PodReiniciandose
+                      expr: increase(kube_pod_container_status_restarts_total[15m]) > 2
+                      for: 1m
+                      labels: { severity: warning }
+                      annotations:
+                        summary: '{{ $labels.namespace }}/{{ $labels.pod }} se ha reiniciado {{ $value | printf "%.0f" }} veces en 15 min'
+                    - alert: MetricasSinRespuesta
+                      expr: up == 0
+                      for: 5m
+                      labels: { severity: warning }
+                      annotations:
+                        summary: 'VictoriaMetrics no puede leer las métricas de {{ $labels.job }} ({{ $labels.instance }})'
+        alertmanager:
+          enabled: true
+          fullnameOverride: alertmanager
+          image:
+            tag: v0.35.0               # oculta el token del bot en los logs de error
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 96Mi }
+          podSecurityContext:
+            enabled: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile: { type: RuntimeDefault }
+          securityContext:
+            enabled: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          config:
+            route:
+              receiver: telegram
+              group_by: [alertname]
+              group_wait: 30s          # espera para agrupar alertas que llegan juntas
+              group_interval: 5m
+              repeat_interval: 12h     # recordatorio si sigue activa
+            receivers:
+              - name: telegram
+                telegram_configs:
+                  - bot_token_file: /etc/alertmanager/telegram/bot-token
+                    chat_id_file: /etc/alertmanager/telegram/chat-id
+                    send_resolved: true  # avisa también cuando se resuelve
+                    parse_mode: HTML
+                    message: |-
+                      {{ range .Alerts }}<b>{{ if eq .Status "firing" }}ALERTA{{ else }}RESUELTA{{ end }}: {{ .Labels.alertname }}</b>
+                      {{ .Annotations.summary }}
+                      {{ end }}
+          extraVolumes:
+            - name: telegram
+              secret:
+                secretName: alertmanager-telegram
+          extraVolumeMounts:
+            - name: telegram
+              mountPath: /etc/alertmanager/telegram
+              readOnly: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
